@@ -137,6 +137,23 @@ nav {
 .cd-lbl { font-size: 9px; letter-spacing: 2px; text-transform: uppercase; color: var(--muted); margin-top: 4px; display: block; }
 .cd-sep { font-size: 28px; color: var(--border); align-self: center; padding-bottom: 16px; }
 
+/* weather */
+.weather-row {
+  margin-top: 32px; display: flex; gap: 12px; flex-wrap: wrap; justify-content: center;
+  animation: fadeUp .7s .52s ease both;
+}
+.weather-card {
+  display: flex; align-items: center; gap: 14px;
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 40px; padding: 10px 20px;
+}
+.weather-icon { font-size: 22px; line-height: 1; }
+.weather-temp { font-family: 'Playfair Display', serif; font-size: 22px; font-weight: 700; color: var(--cream); }
+.weather-divider { width: 1px; height: 20px; background: var(--border); }
+.weather-city { font-size: 10px; letter-spacing: 2px; text-transform: uppercase; color: var(--gold); font-weight: 500; margin-bottom: 2px; }
+.weather-desc { font-size: 12px; color: var(--muted); }
+.weather-wind { font-size: 11px; color: var(--muted); opacity: .7; }
+
 /* nav-cta */
 .hero-cta {
   margin-top: 44px; display: flex; gap: 12px; flex-wrap: wrap; justify-content: center;
@@ -344,6 +361,28 @@ nav {
       <div class="cd-unit"><span class="cd-num" id="cd-m">--</span><span class="cd-lbl">Minuuttia</span></div>
       <div class="cd-sep">:</div>
       <div class="cd-unit"><span class="cd-num" id="cd-s">--</span><span class="cd-lbl">Sekuntia</span></div>
+    </div>
+    <div class="weather-row" id="weather-row" style="display:none">
+      <div class="weather-card" id="weather-london">
+        <span class="weather-icon" id="w-icon">☁️</span>
+        <span class="weather-temp" id="w-temp">--°C</span>
+        <div class="weather-divider"></div>
+        <div>
+          <div class="weather-city">London</div>
+          <div class="weather-desc" id="w-desc"></div>
+          <div class="weather-wind" id="w-wind"></div>
+        </div>
+      </div>
+      <div class="weather-card" id="weather-nurmi">
+        <span class="weather-icon" id="n-icon">☁️</span>
+        <span class="weather-temp" id="n-temp">--°C</span>
+        <div class="weather-divider"></div>
+        <div>
+          <div class="weather-city">Nurmijärvi</div>
+          <div class="weather-desc" id="n-desc"></div>
+          <div class="weather-wind" id="n-wind"></div>
+        </div>
+      </div>
     </div>
     <div class="hero-cta">
       <button class="btn-primary" onclick="show('sched')">Katso aikataulu</button>
@@ -663,6 +702,16 @@ nav {
       <div class="faq-a">Mikko Kuusisto ja Eero Kettunen</div>
     </div>
 
+    <div class="faq-item">
+      <div class="faq-q">Miten maksan?</div>
+      <div class="faq-a">Tullaan perimään kustannukset muutamassa erässä MobilePaylla. Lennot, hostelli ja F1 Arcade maksu tulee etukäteen ja muut myöhemmin. Kysy meiltä lisää kustannuksista ja miten ne jakautuvat!</div>
+    </div>
+
+    <div class="faq-item">
+      <div class="faq-q">Mikä sää Lontoossa on?</div>
+      <div class="faq-a">Siellä sataa melko usein, mutta välillä paistaa myös aurinko.</div>
+    </div>
+
   </div>
 </div>
 
@@ -753,6 +802,45 @@ window.show = function(id) {
   _origShow(id);
   if (id === 'map') setTimeout(initLeafletMap, 50);
 };
+
+/* ── Weather (Open-Meteo, no API key needed) ── */
+const WMO = {
+  0:'Selkeää',1:'Lähes selkeää',2:'Puolipilvistä',3:'Pilvistä',
+  45:'Sumua',48:'Sumua',
+  51:'Tihkusadetta',53:'Tihkusadetta',55:'Tihkusadetta',
+  61:'Sadetta',63:'Sadetta',65:'Runsaasti sadetta',
+  71:'Lumisadetta',73:'Lumisadetta',75:'Runsaasti lunta',
+  80:'Sadekuuroja',81:'Sadekuuroja',82:'Rajuja kuuroja',
+  95:'Ukkosmyrsky',96:'Ukkosmyrsky',99:'Ukkosmyrsky',
+};
+const WMO_ICON = {
+  0:'☀️',1:'🌤️',2:'⛅',3:'☁️',
+  45:'🌫️',48:'🌫️',
+  51:'🌦️',53:'🌦️',55:'🌦️',
+  61:'🌧️',63:'🌧️',65:'🌧️',
+  71:'🌨️',73:'🌨️',75:'🌨️',
+  80:'🌧️',81:'🌧️',82:'⛈️',
+  95:'⛈️',96:'⛈️',99:'⛈️',
+};
+function fetchWeather(lat, lng, timezone, ids) {
+  return fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lng}&current=temperature_2m,weathercode,windspeed_10m&timezone=${encodeURIComponent(timezone)}&forecast_days=1`)
+    .then(r => r.json())
+    .then(d => {
+      const c = d.current, code = c.weathercode;
+      document.getElementById(ids.icon).textContent = WMO_ICON[code] || '🌡️';
+      document.getElementById(ids.temp).textContent = Math.round(c.temperature_2m) + '°C';
+      document.getElementById(ids.desc).textContent = WMO[code] || '—';
+      document.getElementById(ids.wind).textContent = 'Tuuli ' + Math.round(c.windspeed_10m) + ' km/h';
+    });
+}
+
+Promise.allSettled([
+  fetchWeather(51.5074, -0.1278, 'Europe/London',   { icon:'w-icon', temp:'w-temp', desc:'w-desc', wind:'w-wind' }),
+  fetchWeather(60.4681,  24.8041, 'Europe/Helsinki', { icon:'n-icon', temp:'n-temp', desc:'n-desc', wind:'n-wind' }),
+]).then(results => {
+  if (results.some(r => r.status === 'fulfilled'))
+    document.getElementById('weather-row').style.display = 'flex';
+});
 </script>
 </body>
 </html>
