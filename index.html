@@ -561,6 +561,10 @@ nav {
         <div class="legend-dot" style="background:#3ca064"></div>
         <div class="legend-body"><div class="legend-name">Beechwood</div><div class="legend-sub">Sunday Roast su klo 11:30</div></div>
       </div>
+      <div class="legend-item" onclick="focusMap(this,6)">
+        <div class="legend-dot" style="background:#a0b4c8"></div>
+        <div class="legend-body"><div class="legend-name">London Stansted Airport</div><div class="legend-sub">Lentokenttä — pe &amp; su</div></div>
+      </div>
     </div>
   </div>
 </div>
@@ -696,6 +700,7 @@ const mapLocs = [
   { name: 'F1 Arcade',                  sub: "St Paul's, la klo 12:45",     lat: 51.5135, lng: -0.0996, color: '#e04545', gmaps: 'F1+Arcade+St+Pauls+London' },
   { name: 'Tayyabs',                    sub: 'La-dinneri klo 19:00 — BYOB', lat: 51.5149, lng: -0.0620, color: '#c9933a', gmaps: 'Tayyabs+Whitechapel+London' },
   { name: 'Beechwood',                  sub: 'Sunday Roast su klo 11:30',   lat: 51.5200, lng: -0.0560, color: '#3ca064', gmaps: 'Beechwood+London' },
+  { name: 'London Stansted Airport',    sub: 'Lentokenttä — pe & su',       lat: 51.8853, lng:  0.2350, color: '#a0b4c8', gmaps: 'London+Stansted+Airport', zoom: 12 },
 ];
 
 /* ── Map (Leaflet) ── */
@@ -731,7 +736,7 @@ function focusMap(el, idx) {
   el.classList.add('active-loc');
   if (!leafletMap) return;
   const loc = mapLocs[idx];
-  leafletMap.flyTo([loc.lat, loc.lng], 15, { duration: 0.8 });
+  leafletMap.flyTo([loc.lat, loc.lng], loc.zoom || 15, { duration: 0.8 });
   leafletMarkers[idx].openPopup();
 }
 
