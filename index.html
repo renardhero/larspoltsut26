@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Lars Polttarit — Lontoo 2026</title>
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,700;0,900;1,700&family=DM+Sans:ital,wght@0,300;0,400;0,500;1,300&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
 
 <style>
 /* ─── TOKENS ─────────────────────────────────────────────── */
@@ -208,7 +209,7 @@ nav {
    PAGE 3 — KARTTA
 ═══════════════════════════════════════════════════════════ */
 .map-wrap { max-width: 960px; margin: 0 auto; padding: 48px 20px 60px; }
-#map-frame { width: 100%; height: 460px; border-radius: 10px; border: 1px solid var(--border); display: block; }
+#map { width: 100%; height: 460px; border-radius: 10px; border: 1px solid var(--border); }
 .map-legend { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 24px; }
 .legend-item {
   display: flex; align-items: center; gap: 10px;
@@ -269,7 +270,6 @@ nav {
 .divider { width: 40px; height: 2px; background: var(--gold); opacity: .4; margin: 0 auto 32px; }
 
 /* Leaflet dark override */
-.leaflet-tile { filter: brightness(.75) saturate(.6) hue-rotate(190deg); }
 .leaflet-container { background: var(--bg2); font-family: 'DM Sans', sans-serif; }
 
 @media(max-width:520px){
@@ -536,7 +536,6 @@ nav {
       <p>Klikkaa pisteitä nähdäksesi lisätiedot</p>
     </div>
     <div id="map"></div>
-    <canvas id="map-canvas" style="width:100%;height:460px;border-radius:10px;border:1px solid var(--border);display:block;cursor:pointer;"></canvas>
     <div class="map-legend">
       <div class="legend-item active-loc" onclick="focusMap(this,0)">
         <div class="legend-dot" style="background:#5b9bd5"></div>
@@ -656,6 +655,7 @@ nav {
 </div>
 
 <!-- ─── SCRIPTS ─────────────────────────────────────────── -->
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
 /* ── Navigation ── */
 const pages = ['home','sched','map','action','faq'];
@@ -698,146 +698,48 @@ const mapLocs = [
   { name: 'Beechwood',                  sub: 'Sunday Roast su klo 11:30',   lat: 51.5200, lng: -0.0560, color: '#3ca064', gmaps: 'Beechwood+London' },
 ];
 
-const MAP = { minLat:51.490, maxLat:51.540, minLng:-0.145, maxLng:-0.045 };
+/* ── Map (Leaflet) ── */
+let leafletMap = null;
+const leafletMarkers = [];
 
-function toCanvas(lat, lng, W, H) {
-  return {
-    x: (lng - MAP.minLng) / (MAP.maxLng - MAP.minLng) * W,
-    y: (MAP.maxLat - lat) / (MAP.maxLat - MAP.minLat) * H
-  };
-}
-
-function drawMap(highlight) {
-  const canvas = document.getElementById('map-canvas');
-  if (!canvas) return;
-  const dpr = window.devicePixelRatio || 1;
-  const W = canvas.offsetWidth, H = canvas.offsetHeight;
-  canvas.width = W * dpr; canvas.height = H * dpr;
-  const ctx = canvas.getContext('2d');
-  ctx.scale(dpr, dpr);
-
-  // Background
-  ctx.fillStyle = '#0f1923';
-  ctx.fillRect(0, 0, W, H);
-
-  // Subtle grid
-  ctx.strokeStyle = 'rgba(255,255,255,0.03)';
-  ctx.lineWidth = 1;
-  for (let x = 0; x < W; x += 60) { ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,H); ctx.stroke(); }
-  for (let y = 0; y < H; y += 60) { ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(W,y); ctx.stroke(); }
-
-  // Major road hints (simplified)
-  const roads = [
-    // A3 / Waterloo Rd going SE
-    [[-0.1140,51.5020],[-0.1050,51.5060],[-0.0940,51.5080]],
-    // Southwark St
-    [[-0.1020,51.5060],[-0.0900,51.5055],[-0.0860,51.5040]],
-    // Victoria Embankment / Upper Thames St
-    [[-0.1450,51.5060],[-0.1130,51.5075],[-0.0990,51.5090],[-0.0860,51.5070],[-0.0750,51.5055]],
-    // Strand / Fleet St / Ludgate Hill
-    [[-0.1250,51.5130],[-0.1050,51.5140],[-0.0990,51.5135],[-0.0950,51.5130]],
-  ];
-  ctx.strokeStyle = 'rgba(255,255,255,0.06)';
-  ctx.lineWidth = 3;
-  roads.forEach(pts => {
-    ctx.beginPath();
-    pts.forEach(([lng,lat],i) => {
-      const p = toCanvas(lat,lng,W,H);
-      i===0 ? ctx.moveTo(p.x,p.y) : ctx.lineTo(p.x,p.y);
-    });
-    ctx.stroke();
-  });
-
-  // Thames river — wide base
-  ctx.strokeStyle = 'rgba(40,90,160,0.45)';
-  ctx.lineWidth = 28;
-  ctx.lineCap = 'round';
-  ctx.lineJoin = 'round';
-  const thamesPath = [
-    [-0.145,51.498],[-0.130,51.499],[-0.120,51.500],
-    [-0.113,51.504],[-0.105,51.508],[-0.100,51.510],
-    [-0.090,51.508],[-0.082,51.506],[-0.073,51.504],
-    [-0.062,51.503],[-0.050,51.503]
-  ];
-  ctx.beginPath();
-  thamesPath.forEach(([lng,lat],i) => {
-    const p = toCanvas(lat,lng,W,H);
-    i===0 ? ctx.moveTo(p.x,p.y) : ctx.lineTo(p.x,p.y);
-  });
-  ctx.stroke();
-
-  // Thames sheen
-  ctx.strokeStyle = 'rgba(80,140,220,0.18)';
-  ctx.lineWidth = 10;
-  ctx.beginPath();
-  thamesPath.forEach(([lng,lat],i) => {
-    const p = toCanvas(lat,lng,W,H);
-    i===0 ? ctx.moveTo(p.x,p.y-3) : ctx.lineTo(p.x,p.y-3);
-  });
-  ctx.stroke();
-
-  // Thames label
-  ctx.fillStyle = 'rgba(100,160,220,0.35)';
-  ctx.font = 'italic 11px DM Sans, sans-serif';
-  ctx.letterSpacing = '2px';
-  const tl = toCanvas(51.505, -0.108, W, H);
-  ctx.fillText('River Thames', tl.x - 20, tl.y + 22);
-
-  // Location dots + labels
+function initLeafletMap() {
+  if (leafletMap) return;
+  leafletMap = L.map('map', { center: [51.508, -0.090], zoom: 13 });
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+    attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors © <a href="https://carto.com/attributions">CARTO</a>',
+    subdomains: 'abcd',
+    maxZoom: 19,
+  }).addTo(leafletMap);
   mapLocs.forEach((loc, i) => {
-    const p = toCanvas(loc.lat, loc.lng, W, H);
-    const isHi = highlight === i;
-    const r = isHi ? 10 : 7;
-
-    // Glow
-    const grad = ctx.createRadialGradient(p.x,p.y,0,p.x,p.y,r*3);
-    grad.addColorStop(0, loc.color + '55');
-    grad.addColorStop(1, 'transparent');
-    ctx.fillStyle = grad;
-    ctx.beginPath(); ctx.arc(p.x,p.y,r*3,0,Math.PI*2); ctx.fill();
-
-    // Dot
-    ctx.beginPath(); ctx.arc(p.x,p.y,r,0,Math.PI*2);
-    ctx.fillStyle = loc.color;
-    ctx.fill();
-    ctx.strokeStyle = 'rgba(255,255,255,0.7)';
-    ctx.lineWidth = 2;
-    ctx.stroke();
-
-    // Label
-    const labelX = p.x + 14, labelY = p.y + 4;
-    ctx.font = isHi ? 'bold 13px DM Sans,sans-serif' : '12px DM Sans,sans-serif';
-    ctx.fillStyle = isHi ? '#f0ead8' : 'rgba(220,210,195,0.85)';
-    ctx.fillText(loc.name, labelX, labelY);
+    const circle = L.circleMarker([loc.lat, loc.lng], {
+      radius: 9, fillColor: loc.color,
+      color: 'rgba(255,255,255,0.7)', weight: 2, opacity: 1, fillOpacity: 0.95,
+    }).addTo(leafletMap);
+    circle.bindPopup(
+      `<strong>${loc.name}</strong><br>` +
+      `<span style="color:#7a8799;font-size:12px">${loc.sub}</span><br>` +
+      `<a href="https://maps.google.com/maps?q=${loc.gmaps}" target="_blank" ` +
+      `style="color:#c9933a;font-size:11px;text-decoration:underline;margin-top:6px;display:inline-block">` +
+      `Avaa Google Mapsissa ↗</a>`
+    );
+    leafletMarkers.push(circle);
   });
-
-  // Compass
-  const cx = W - 36, cy = 36;
-  ctx.fillStyle = 'rgba(255,255,255,0.08)';
-  ctx.beginPath(); ctx.arc(cx,cy,18,0,Math.PI*2); ctx.fill();
-  ctx.fillStyle = 'rgba(255,255,255,0.5)';
-  ctx.font = 'bold 11px DM Sans';
-  ctx.textAlign = 'center';
-  ctx.fillText('N', cx, cy+4);
-  ctx.textAlign = 'left';
 }
 
 function focusMap(el, idx) {
   document.querySelectorAll('.legend-item').forEach(i => i.classList.remove('active-loc'));
   el.classList.add('active-loc');
-  drawMap(idx);
-  window.open('https://maps.google.com/maps?q=' + mapLocs[idx].gmaps, '_blank');
+  if (!leafletMap) return;
+  const loc = mapLocs[idx];
+  leafletMap.flyTo([loc.lat, loc.lng], 15, { duration: 0.8 });
+  leafletMarkers[idx].openPopup();
 }
 
-// Init map when tab shown
 const _origShow = window.show;
 window.show = function(id) {
   _origShow(id);
-  if (id === 'map') setTimeout(() => drawMap(-1), 50);
+  if (id === 'map') setTimeout(initLeafletMap, 50);
 };
-window.addEventListener('resize', () => {
-  if (document.getElementById('page-map').classList.contains('active')) drawMap(-1);
-});
 </script>
 </body>
 </html>
